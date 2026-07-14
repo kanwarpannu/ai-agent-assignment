@@ -1,8 +1,10 @@
-from typing import Any
+from typing import List, Optional, Dict, Any
+from pydantic import BaseModel
 from openai import OpenAI
 import os
 from lib.messages import (
     AnyMessage,
+    TokenUsage,
     AIMessage,
     BaseMessage,
     UserMessage,
@@ -15,12 +17,12 @@ class LLM:
         self,
         model: str = "gpt-4o-mini",
         temperature: float = 0.0,
-        tools: list[Tool] | None = None,
-        api_key: str | None = None
+        tools: Optional[List[Tool]] = None,
+        api_key: Optional[str] = None
     ):
         self.model = model
         self.temperature = temperature
-
+        
         resolved_api_key = os.getenv("OPENAI_API_KEY")
         resolved_base_url = os.getenv("OPENAI_BASE_URL")
 
@@ -28,15 +30,14 @@ class LLM:
             api_key=resolved_api_key,
             base_url=resolved_base_url
         )
-
-        self.tools: dict[str, Tool] = {
+        self.tools: Dict[str, Tool] = {
             tool.name: tool for tool in (tools or [])
         }
 
     def register_tool(self, tool: Tool):
         self.tools[tool.name] = tool
 
-    def _build_payload(self, messages: list[BaseMessage]) -> dict[str, Any]:
+    def _build_payload(self, messages: List[BaseMessage]) -> Dict[str, Any]:
         payload = {
             "model": self.model,
             "temperature": self.temperature,
@@ -49,7 +50,7 @@ class LLM:
 
         return payload
 
-    def _convert_input(self, input: Any) -> list[BaseMessage]:
+    def _convert_input(self, input: Any) -> List[BaseMessage]:
         if isinstance(input, str):
             return [UserMessage(content=input)]
         elif isinstance(input, BaseMessage):
@@ -59,14 +60,29 @@ class LLM:
         else:
             raise ValueError(f"Invalid input type {type(input)}.")
 
-    def invoke(self, input: str | BaseMessage | list[BaseMessage]) -> AIMessage:
+    def invoke(self, 
+               input: str | BaseMessage | List[BaseMessage],
+               response_format: BaseModel = None,) -> AIMessage:
         messages = self._convert_input(input)
         payload = self._build_payload(messages)
-        response = self.client.chat.completions.create(**payload)
+        if response_format:
+            payload.update({"response_format": response_format})
+            response = self.client.beta.chat.completions.parse(**payload)
+        else:
+            response = self.client.chat.completions.create(**payload)
         choice = response.choices[0]
         message = choice.message
 
+        token_usage = None
+        if response.usage:
+            token_usage = TokenUsage(
+                prompt_tokens=response.usage.prompt_tokens,
+                completion_tokens=response.usage.completion_tokens,
+                total_tokens=response.usage.total_tokens
+            )
+
         return AIMessage(
             content=message.content,
-            tool_calls=message.tool_calls
+            tool_calls=message.tool_calls,
+            token_usage=token_usage
         )

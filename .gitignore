@@ -25,6 +25,7 @@ share/python-wheels/
 *.egg
 MANIFEST
 index_data/
+starter/chromadb/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template

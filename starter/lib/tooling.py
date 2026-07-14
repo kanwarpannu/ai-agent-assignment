@@ -1,29 +1,28 @@
 import inspect
 import datetime
-import sys
 from typing import (
-    Callable, Any, get_type_hints, get_origin, get_args,
-    Literal, Union
+    Any, Callable, 
+    Literal, Optional, Union, TypeAlias,
+    get_type_hints, get_origin, get_args,
 )
 from functools import wraps
+from openai.types.chat.chat_completion_message_tool_call import ChatCompletionMessageToolCall
 
+
+# Type alias for OpenAI's tool call implementation
+ToolCall: TypeAlias = ChatCompletionMessageToolCall
 
 class Tool:
     def __init__(
         self,
         func: Callable,
-        name: str | None = None,
-        description: str | None = None
+        name: Optional[str] = None,
+        description: Optional[str] = None
     ):
         self.func = func
         self.name = name or func.__name__
         self.description = description or inspect.getdoc(func)
-        
-        if sys.version_info >= (3, 10):
-            self.signature = inspect.signature(func, eval_str=True)
-        else:
-            self.signature = inspect.signature(func)
-
+        self.signature = inspect.signature(func, eval_str=True)
         self.type_hints = get_type_hints(func)
 
         self.parameters = [
@@ -122,5 +121,5 @@ def tool(func=None, *, name: str = None, description: str = None):
             return f(*args, **kwargs)
         return Tool(f, name=name, description=description)
     
-    # @tool or @tool(name="foo")
+    # @tool ou @tool(name="foo")
     return wrapper(func) if func else wrapper

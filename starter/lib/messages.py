@@ -1,11 +1,14 @@
 from pydantic import BaseModel
-from typing import Any, Literal, Union
+from typing import Optional, Union, List, Dict, Literal
+
+from lib.tooling import ToolCall
 
 
 class BaseMessage(BaseModel):
-    content: str | None = ""
+    role: str
+    content: Optional[str] = ""
 
-    def dict(self) -> dict:
+    def dict(self) -> Dict:
         return dict(self)
 
 
@@ -21,11 +24,20 @@ class ToolMessage(BaseMessage):
     role: Literal["tool"] = "tool"
     tool_call_id: str
     name: str
+    content: str = ""
+
+
+class TokenUsage(BaseModel):
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
 
 
 class AIMessage(BaseMessage):
     role: Literal["assistant"] = "assistant"
-    tool_calls: list[Any] | None = None
+    content: Optional[str] = ""
+    tool_calls: Optional[List[ToolCall]] = None
+    token_usage: Optional[TokenUsage] = None
 
 
 AnyMessage = Union[
